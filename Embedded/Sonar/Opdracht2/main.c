@@ -12,7 +12,9 @@
  #ifndef F_CPU
  #define F_CPU 16000000UL
  #endif
-
+ 
+#define TRIGGER PB0
+#define ECHO PB1
 
 #include <avr/io.h>
 #include <util/delay.h>
@@ -37,44 +39,21 @@ int main()
 {
 	unsigned int wacht = 10;
 
-	DDRB = (1 << PB7); // arduino MEGA
-	DDRB = (1 << PB0); //trigger pin
-	//DDRB = (1 << PB5); // arduino UNO
+	DDRB = (1 << TRIGGER); //trigger pin
 
 
 	UART_Init(MYUBRR);
 
 	while(1) 
 	{
-		PORTB ^= (1 << PB7); // arduino MEGA
-		//PORTB ^= (1 << PB5); // arduino UNO
-
-		//UART_Transmit('A');
-		//ontvang = UART_Receive();
-		if(state == RECEIVED_TRUE)
-		{
-			switch(ontvang)
-			{
-				case '1':
-				{
-					wacht = 10;
-					break;
-				}
-				case '2':
-				{
-					wacht = 5;
-					break;
-				}
-				case '3':
-				{
-					wacht = 1;
-					break;
-				}
-			}
-			state = RECEIVED_FALSE;
-		}
-		
-		wait( wacht );
+		//zet trigger op 1
+		//wacht 10 microseconden
+		//zet trigger op 0
+		//start timer
+		//wacht totdat echo 1 is
+		//stop timer
+		//bereken afstand
+		//transmit afstand
 	}
 }
 
