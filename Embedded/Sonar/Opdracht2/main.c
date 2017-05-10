@@ -19,6 +19,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
+#include <time.h>
 
 
 #define BAUD 9600
@@ -35,25 +36,40 @@ void UART_Transmit( unsigned char data );
 char ontvang; // global variable to store received data
 int state = RECEIVED_FALSE;
 
+
 int main() 
 {
-	unsigned int wacht = 10;
+	//unsigned int wacht = 10;
+	//bool echo = false;
 
 	DDRB = (1 << TRIGGER); //trigger pin
-
+	TCCR1B |= (1 << CS10) | (1 << CS12);							//prescaler 1024
+	TCNT1 = 0;
 
 	UART_Init(MYUBRR);
 
 	while(1) 
 	{
-		//zet trigger op 1
-		//wacht 10 microseconden
-		//zet trigger op 0
-		//start timer
-		//wacht totdat echo 1 is
-		//stop timer
-		//bereken afstand
-		//transmit afstand
+		
+		PORTB |= (1 << TRIGGER);										//zet trigger op 1
+		_delay_us(10);													//wacht 10 microseconden
+		PORTB &= ~(1 << TRIGGER);										//zet trigger op 0
+
+		//clock_t begin = clock();										//start timer0, normal mode, 		
+		while( !(PINB & (1 << ECHO))) {}								//wacht totdat echo 1 is
+			
+
+		//clock_t end = clock();											//start timer
+																			//wacht totdat echo 0 is
+																			//stop timer
+		//double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;		//bereken tijd
+		double afstand; // = time_spent / 340 / 2;							//bereken afstand
+		
+		char* out[256];													//transmit
+		sprintf(out, "%f",afstand);
+		for(int i=0;i<sizeof(out);i++){
+			UART_Transmit(out[i]);
+		}
 	}
 }
 
