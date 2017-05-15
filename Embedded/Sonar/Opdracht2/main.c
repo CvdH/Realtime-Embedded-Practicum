@@ -34,6 +34,7 @@
 #define INSTR_PER_MS 16000        // instructions per millisecond (depends on MCU clock, 16MHz current)
 #define MAX_RESP_TIME_MS 200      // timeout - max time to wait for low voltage drop (higher value increases measuring distance at the price of slower sampling)
 #define DELAY_BETWEEN_TESTS_MS 50 // echo cancelling time between sampling
+#define MAX_RANGE 100
 
 void wait(unsigned int);
 void UART_Init( unsigned int ubrr );
@@ -68,7 +69,7 @@ int main()
 	while(1) 
 	{
 		if(running == 0)
-		{
+		{	
 			_delay_ms(DELAY_BETWEEN_TESTS_MS);
 			pulse();
 			sprintf(out, "Afstand = %dCM", result);
