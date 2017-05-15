@@ -2,19 +2,13 @@
  * opd1.c
  *
  *  Created on: Apr 28, 2016
- *      Author: john
- *
- * opd1.c
- *
- *  Created on: Apr 28, 2016
- *      Author: john
+ *      Author: Marcel Vincourt, Casper van der Hout
  */
  #ifndef F_CPU
  #define F_CPU 16000000UL
  #endif
  
 #define TRIGGER PB0
-//#define ECHO PB1
 
 #include <avr/io.h>
 #include <util/delay.h>
@@ -30,10 +24,10 @@
 #define RECEIVED_TRUE 1
 #define RECEIVED_FALSE 0
 
-#define INSTR_PER_US 16           // instructions per microsecond (depends on MCU clock, 16MHz current)
-#define INSTR_PER_MS 16000        // instructions per millisecond (depends on MCU clock, 16MHz current)
-#define MAX_RESP_TIME_MS 200      // timeout - max time to wait for low voltage drop (higher value increases measuring distance at the price of slower sampling)
-#define DELAY_BETWEEN_TESTS_MS 50 // echo cancelling time between sampling
+#define INSTR_PER_US 16												// instructions per microsecond (depends on MCU clock, 16MHz current)
+#define INSTR_PER_MS 16000											// instructions per millisecond (depends on MCU clock, 16MHz current)
+#define MAX_RESP_TIME_MS 200										// timeout - max time to wait for low voltage drop
+#define DELAY_BETWEEN_TESTS_MS 50									// echo cancelling time between sampling
 
 void wait(unsigned int);
 void UART_Init( unsigned int ubrr );
@@ -45,19 +39,18 @@ void INT1_init( void );
 void pulse( void );
 void timer1_init( void );
 
-char ontvang; // global variable to store received data
+char ontvang;														// Global variable to store received data
 int state = RECEIVED_FALSE;
-//volatile uint8_t tot_overflow;
 char out[256];	
 
-volatile uint8_t running = 0; // state to see if the pulse has been send.
+volatile uint8_t running = 0;										// State to see if the pulse has been send.
 volatile uint8_t up = 0;
 volatile uint32_t timerCounter = 0;
 volatile unsigned long result = 0;
 
 int main() 
 {
-	DDRB = (1 << TRIGGER); //trigger pin
+	DDRB = (1 << TRIGGER);											// Trigger pin
 
 	UART_Init(MYUBRR);
 	INT1_init();
@@ -78,7 +71,7 @@ int main()
 }
 
 void wait(unsigned int a)
- {
+{
 	while(a--)
 		_delay_ms(50);
 }
@@ -86,23 +79,17 @@ void wait(unsigned int a)
 
 void UART_Init( unsigned int ubrr)
 {
-	/* Set baud rate */
-	UBRR0H = (ubrr>>8);
+	UBRR0H = (ubrr>>8);												// Set baud rate
 	UBRR0L = ubrr;
 
-	/* Enable receiver and transmitter and enable RX interrupt */
-	UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);
-	/* Set frame format: 8data, 1 stop bit */
-	UCSR0C = (3<<UCSZ00);
+	UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);					// Enable receiver and transmitter and enable RX interrupt
+	UCSR0C = (3<<UCSZ00);											// Set frame format: 8data, 1 stop bit
 }
 
 void UART_Transmit( unsigned char data )
 {
-	/* Wait for empty transmit buffer */
-	while ( !( UCSR0A & (1<<UDRE0)) )
-	;
-	/* Put data into buffer, sends the data */
-	UDR0 = data;
+	while ( !( UCSR0A & (1<<UDRE0)) ) {};							// Wait for empty transmit buffer
+	UDR0 = data;													// Put data into buffer, sends the data
 }
 
 void UART_Transmit_String(const char *stringPtr)
@@ -119,11 +106,8 @@ void UART_Transmit_String(const char *stringPtr)
 
 unsigned char UART_Receive( void )
 {
-	/* Wait for data to be received */
-	while ( !(UCSR0A & (1<<RXC0)) )
-	;
-	/* Get and return received data from buffer */
-	return UDR0;
+	while ( !(UCSR0A & (1<<RXC0)) )	{};								// Wait for data to be received 	
+	return UDR0;													// Get and return received data from buffer 
 }
 
 ISR(USART0_RX_vect)
@@ -135,20 +119,20 @@ ISR(USART0_RX_vect)
 
 void INT1_init()
 {
-	EICRA |= (1 << ISC10) | (0 << ISC11); // set rising or falling edge on INT1
-	EIMSK |= (1 << INT1); //enable INT1
+	EICRA |= (1 << ISC10) | (0 << ISC11);							// set rising or falling edge on INT1
+	EIMSK |= (1 << INT1);											// Enable INT1
 }
 ISR(INT1_vect)
 {
-	if(running) // check if the pulse has been send.
+	if(running)														// check if the pulse has been send.
 	{
-		if(up == 0) // voltage rise
+		if(up == 0)													// voltage rise
 		{
 			up = 1;
 			timerCounter = 0;
 			TCNT1 = 0;
 		}
-		else // faling edge
+		else														// faling edge
 		{
 			up = 0;
 			result = ((timerCounter * 65535 + TCNT1) / 58) / 2;
@@ -162,20 +146,20 @@ void pulse()
 	_delay_us(1);
 
 
-	PORTB |= (1 << TRIGGER);										//zet trigger op 1
+	PORTB |= (1 << TRIGGER);										// zet trigger op 1
 	running = 1;
-	_delay_us(10);													//wacht 10 microseconden
-	PORTB &= ~(1 << TRIGGER);										//zet trigger op 0
+	_delay_us(10);													// wacht 10 microseconden
+	PORTB &= ~(1 << TRIGGER);										// zet trigger op 0
 }
 
 
 void timer1_init()
 {
-	TCCR1B |= (0 << CS10) | (1 << CS11) | (0 << CS12);			//prescaler 1024 so we get 15625Hz clock ticks. or 4.19 s per tick.
-	TCNT1 = 0;													//init counter
-	TIMSK1 |= (1 << TOIE1);										//enable overflow interrupt
-	//tot_overflow = 0;
+	TCCR1B |= (0 << CS10) | (1 << CS11) | (0 << CS12);				// prescaler 1024 so we get 15625Hz clock ticks. or 4.19 s per tick.
+	TCNT1 = 0;														// init counter
+	TIMSK1 |= (1 << TOIE1);											// enable overflow interrupt
 }
+
 ISR(TIMER1_OVF_vect)
 {
 	if(up)
