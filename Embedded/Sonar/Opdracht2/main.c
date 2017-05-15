@@ -13,6 +13,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
+#include <avr/wdt.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +30,7 @@
 #define INSTR_PER_MS 16000											// instructions per millisecond (depends on MCU clock, 16MHz current)
 #define MAX_RESP_TIME_MS 200										// timeout - max time to wait for low voltage drop
 #define DELAY_BETWEEN_TESTS_MS 50									// echo cancelling time between sampling
-#define MAX_RANGE 100
+
 
 void wait(unsigned int);
 void UART_Init( unsigned int ubrr );
@@ -54,12 +55,13 @@ int main()
 {
 	DDRB = (1 << TRIGGER);											// Trigger pin
 
+	
 	UART_Init(MYUBRR);
 	INT1_init();
 	timer1_init();
 	sei();
 
-
+	wdt_enable(WDTO_2S);											// enable watchdog timer at 2 seconds
 	while(1) 
 	{
 		if(running == 0)
@@ -68,6 +70,7 @@ int main()
 			pulse();
 			sprintf(out, "Afstand = %dCM", result);
 			UART_Transmit_String(out);
+			wdt_reset();
 		}	
 	}
 }
