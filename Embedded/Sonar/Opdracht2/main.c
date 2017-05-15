@@ -24,18 +24,12 @@
 #define RECEIVED_TRUE 1
 #define RECEIVED_FALSE 0
 
-<<<<<<< HEAD
-#define INSTR_PER_US 16           // instructions per microsecond (depends on MCU clock, 16MHz current)
-#define INSTR_PER_MS 16000        // instructions per millisecond (depends on MCU clock, 16MHz current)
-#define MAX_RESP_TIME_MS 200      // timeout - max time to wait for low voltage drop (higher value increases measuring distance at the price of slower sampling)
-#define DELAY_BETWEEN_TESTS_MS 50 // echo cancelling time between sampling
-#define MAX_RANGE 100
-=======
+
 #define INSTR_PER_US 16												// instructions per microsecond (depends on MCU clock, 16MHz current)
 #define INSTR_PER_MS 16000											// instructions per millisecond (depends on MCU clock, 16MHz current)
 #define MAX_RESP_TIME_MS 200										// timeout - max time to wait for low voltage drop
 #define DELAY_BETWEEN_TESTS_MS 50									// echo cancelling time between sampling
->>>>>>> 93420c9bfeff05df16acb04b83860027b25583e8
+#define MAX_RANGE 100
 
 void wait(unsigned int);
 void UART_Init( unsigned int ubrr );
