@@ -25,12 +25,10 @@
 #define RECEIVED_TRUE 1
 #define RECEIVED_FALSE 0
 
-
 #define INSTR_PER_US 16												// instructions per microsecond (depends on MCU clock, 16MHz current)
 #define INSTR_PER_MS 16000											// instructions per millisecond (depends on MCU clock, 16MHz current)
 #define MAX_RESP_TIME_MS 200										// timeout - max time to wait for low voltage drop
 #define DELAY_BETWEEN_TESTS_MS 50									// echo cancelling time between sampling
-
 
 void wait(unsigned int);
 void UART_Init( unsigned int ubrr );
@@ -46,7 +44,7 @@ char ontvang;														// Global variable to store received data
 int state = RECEIVED_FALSE;
 char out[256];	
 
-volatile uint8_t running = 0;										// State to see if the pulse has been send.
+volatile uint8_t running = 0;										// State to see if the pulse has been sent.
 volatile uint8_t up = 0;
 volatile uint32_t timerCounter = 0;
 volatile unsigned long result = 0;
@@ -55,7 +53,6 @@ int main()
 {
 	DDRB = (1 << TRIGGER);											// Trigger pin
 
-	
 	UART_Init(MYUBRR);
 	INT1_init();
 	timer1_init();
@@ -129,7 +126,7 @@ void INT1_init()
 }
 ISR(INT1_vect)
 {
-	if(running)														// check if the pulse has been send.
+	if(running)														// check if the pulse has been sent
 	{
 		if(up == 0)													// voltage rise
 		{
@@ -160,7 +157,7 @@ void pulse()
 
 void timer1_init()
 {
-	TCCR1B |= (0 << CS10) | (1 << CS11) | (0 << CS12);				// prescaler 1024 so we get 15625Hz clock ticks. or 4.19 s per tick.
+	TCCR1B |= (0 << CS10) | (1 << CS11) | (0 << CS12);				// prescaler 0
 	TCNT1 = 0;														// init counter
 	TIMSK1 |= (1 << TOIE1);											// enable overflow interrupt
 }
