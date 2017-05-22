@@ -8,7 +8,6 @@
  #define F_CPU 16000000UL
  //#endif
  
-#define TRIGGER PB0
 
 #include <avr/io.h>
 #include <util/delay.h>
@@ -20,29 +19,23 @@
 #include <stdint.h>
 
 #include "FreeRTOS.h"
-#include "task.h" //
+#include "task.h" 
 #include "queue.h"
-#include "semphr.h" //
-#include "serial.h" //
+#include "semphr.h" 
+#include "serial.h"
 
+//Start sonar stuff
 #define BAUD 9600
 #define MYUBRR (((F_CPU / (16UL * BAUD))) - 1)
+#define TRIGGER PB0
 
 #define RECEIVED_TRUE 1
 #define RECEIVED_FALSE 0
-
 
 #define INSTR_PER_US 16												// instructions per microsecond (depends on MCU clock, 16MHz current)
 #define INSTR_PER_MS 16000											// instructions per millisecond (depends on MCU clock, 16MHz current)
 #define MAX_RESP_TIME_MS 200										// timeout - max time to wait for low voltage drop
 #define DELAY_BETWEEN_TESTS_MS 50									// echo cancelling time between sampling
-
-
-void wait(unsigned int);
-void UART_Init( unsigned int ubrr );
-unsigned char UART_Receive( void );
-void UART_Transmit( unsigned char data );
-void UART_Transmit_String(const char *stringPtr);
 
 void INT1_init( void );
 void pulse( void );
@@ -50,35 +43,71 @@ void timer1_init( void );
 
 char ontvang;														// Global variable to store received data
 int state = RECEIVED_FALSE;
-char out[256];	
+char out[256];
 
 volatile uint8_t running = 0;										// State to see if the pulse has been send.
 volatile uint8_t up = 0;
 volatile uint32_t timerCounter = 0;
 volatile unsigned long result = 0;
+//end sonar stuff
+
+//start servo stuff
+//end servo stuff
+
+//start main stuff
+QueueHandle_t sonarAfstand;
+QueueHandle_t servoHoek;
+void initQ();
+void readQ();
+void writeQ();
+void queueTaak();
+void sonarTaak();
+void servoTaak();
+void UART_Init( unsigned int ubrr );
+void UART_Transmit( unsigned char data );
+void UART_Transmit_String(const char *stringPtr);
+int afstand;
+int hoek;
+//end main stuff
 
 int main() 
 {
-	DDRB = (1 << TRIGGER);											// Trigger pin
+	xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
+	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
+	xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
 
-	
-	UART_Init(MYUBRR);
+	vTaskStartScheduler();
+}
+
+void sonarTaak(){
+	DDRB = (1 << TRIGGER);											// Trigger pin
 	INT1_init();
 	timer1_init();
 	sei();
 
 	wdt_enable(WDTO_2S);											// enable watchdog timer at 2 seconds
-	while(1) 
+	while(1)
 	{
 		if(running == 0)
-		{	
+		{
 			_delay_ms(DELAY_BETWEEN_TESTS_MS);
 			pulse();
-			sprintf(out, "Afstand = %dCM", result);
-			UART_Transmit_String(out);
+			xQueueSend(sonarAfstand, (void*) &result,0);
 			wdt_reset();
-		}	
+		}
 	}
+}
+
+void servoTaak(){
+
+}
+
+void queueTaak(){
+	readQ();
+	hoek = afstand / 30 * 180;
+	sprintf(out, "Afstand = %dCM, Hoek = %d", afstand,hoek);
+	UART_Transmit_String(out);
+	writeQ();
 }
 
 void wait(unsigned int a)
@@ -87,6 +116,24 @@ void wait(unsigned int a)
 		_delay_ms(50);
 }
 
+//main functions
+void initQ(){
+	sonarAfstand = xQueueCreate(10,sizeof(int));
+	if(sonarAfstand==0) sonarAfstand = xQueueCreate(10,sizeof(int));
+
+	servoHoek = xQueueCreate(10,sizeof(int));
+	if(servoHoek==0) servoHoek = xQueueCreate(10,sizeof(int));
+}
+
+void writeQ( int data)
+{
+	xQueueSend(servoHoek, (void*) &hoek, 0);
+}
+
+void readQ()
+{
+	xQueueReceive(sonarAfstand, &afstand, 0);
+}
 
 void UART_Init( unsigned int ubrr)
 {
@@ -115,12 +162,6 @@ void UART_Transmit_String(const char *stringPtr)
 	UART_Transmit('\r');
 }
 
-unsigned char UART_Receive( void )
-{
-	while ( !(UCSR0A & (1<<RXC0)) )	{};								// Wait for data to be received 	
-	return UDR0;													// Get and return received data from buffer 
-}
-
 ISR(USART0_RX_vect)
 {
 	ontvang = UDR0;
@@ -128,11 +169,13 @@ ISR(USART0_RX_vect)
 	state = RECEIVED_TRUE;
 }
 
+//Sonar functions
 void INT1_init()
 {
 	EICRA |= (1 << ISC10) | (0 << ISC11);							// set rising or falling edge on INT1
 	EIMSK |= (1 << INT1);											// Enable INT1
 }
+
 ISR(INT1_vect)
 {
 	if(running)														// check if the pulse has been send.
@@ -151,6 +194,7 @@ ISR(INT1_vect)
 		}
 	}
 }
+
 void pulse()
 {
 	PORTB &= ~(1 << TRIGGER);
@@ -162,7 +206,6 @@ void pulse()
 	_delay_us(10);													// wacht 10 microseconden
 	PORTB &= ~(1 << TRIGGER);										// zet trigger op 0
 }
-
 
 void timer1_init()
 {
