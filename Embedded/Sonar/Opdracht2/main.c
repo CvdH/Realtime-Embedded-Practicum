@@ -55,10 +55,12 @@ int main()
 
 	UART_Init(MYUBRR);
 	INT1_init();
+	wdt_enable(WDTO_2S);
 	timer1_init();
 	sei();
 
-	wdt_enable(WDTO_2S);											// enable watchdog timer at 2 seconds
+												// enable watchdog timer at 2 seconds
+	UART_Transmit_String("Setup done");
 	while(1) 
 	{
 		if(running == 0)
@@ -67,7 +69,7 @@ int main()
 			pulse();
 			sprintf(out, "Afstand = %dCM", result);
 			UART_Transmit_String(out);
-			wdt_reset();
+			
 		}	
 	}
 }
@@ -136,6 +138,7 @@ ISR(INT1_vect)
 		}
 		else														// faling edge
 		{
+			wdt_reset();
 			up = 0;
 			result = ((timerCounter * 65535 + TCNT1) / 58) / 2;
 			running = 0;
@@ -175,5 +178,6 @@ ISR(TIMER1_OVF_vect)
 			running = 0;
 			result = -1;
 		}
+		
 	}
 }
