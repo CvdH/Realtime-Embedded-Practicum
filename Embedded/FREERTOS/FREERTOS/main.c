@@ -78,6 +78,7 @@ int main()
 	timer1_init();
 	sei();
 	UART_Transmit_String("Setup done");
+	initQ();
 
 	xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
 	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
