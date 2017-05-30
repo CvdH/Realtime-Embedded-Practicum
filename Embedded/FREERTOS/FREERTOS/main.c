@@ -72,6 +72,13 @@ int hoek;
 
 int main() 
 {
+	DDRB = (1 << TRIGGER);											// Trigger pin
+	UART_Init(MYUBRR);
+	INT1_init();
+	timer1_init();
+	sei();
+	UART_Transmit_String("Setup done");
+
 	xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
 	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
 	xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
@@ -79,13 +86,9 @@ int main()
 	vTaskStartScheduler();
 }
 
-void sonarTaak(){
-	DDRB = (1 << TRIGGER);											// Trigger pin
-	INT1_init();
-	timer1_init();
-	sei();
-
-	wdt_enable(WDTO_2S);											// enable watchdog timer at 2 seconds
+void sonarTaak()
+{
+	//wdt_enable(WDTO_2S);											// enable watchdog timer at 2 seconds
 	while(1)
 	{
 		if(running == 0)
