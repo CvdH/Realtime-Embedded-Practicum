@@ -72,16 +72,17 @@ int hoek;
 static void TaskBlinkLED(void *pvParameters);
 int main() 
 {
-	//DDRB = (1 << TRIGGER);											// Trigger pin
-	//UART_Init(MYUBRR);
-	//INT1_init();
-	//timer1_init();
-	//sei();
-	//UART_Transmit_String("Setup done");
-	xTaskCreate(TaskBlinkLED, (const portCHAR *)"LED", 256, NULL, 3, NULL);
-	//xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
-	//xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
-	//xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
+	DDRB = (1 << TRIGGER);											// Trigger pin
+	UART_Init(MYUBRR);
+	INT1_init();
+	timer1_init();
+	sei();
+	initQ();
+	UART_Transmit_String("Setup done");
+
+	xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
+	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
+//	xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
 
 	vTaskStartScheduler();
 
@@ -120,6 +121,7 @@ static void TaskBlinkLED(void *pvParameters)
 
 void sonarTaak()
 {
+	//UART_Transmit_String("taak uitgevoerd");
 	//wdt_enable(WDTO_2S);											// enable watchdog timer at 2 seconds
 	while(1)
 	{
@@ -128,7 +130,8 @@ void sonarTaak()
 			_delay_ms(DELAY_BETWEEN_TESTS_MS);
 			pulse();
 			xQueueSend(sonarAfstand, (void*) &result,0);
-			wdt_reset();
+			//UART_Transmit_String("loop");
+			//wdt_reset();
 		}
 	}
 }
@@ -138,11 +141,17 @@ void servoTaak(){
 }
 
 void queueTaak(){
-	readQ();
-	hoek = afstand / 30 * 180;
-	sprintf(out, "Afstand = %dCM, Hoek = %d", afstand,hoek);
-	UART_Transmit_String(out);
-	writeQ();
+	while(1){
+		//_delay_ms(DELAY_BETWEEN_TESTS_MS);
+		readQ();
+		if (afstand > 30) {
+			afstand = 30;
+		}
+		hoek = afstand / 30.0 * 180.0;
+		sprintf(out, "Afstand = %dCM, Hoek = %d", afstand,hoek);
+		UART_Transmit_String(out);
+		writeQ();
+	}
 }
 
 void wait(unsigned int a)
