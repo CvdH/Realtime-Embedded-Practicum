@@ -21,6 +21,34 @@ void wait(unsigned);
 bool received = false;
 uint8_t data = 0;
 
+//pwm frequentie = clock/(2*prescalar*TOP)
+//16 bit timer phase correct
+//pre scalar 8
+// top 20000
+// 20000 = 20 ms
+// 900   = 0.9ms = 0 graden
+// 1500  = 1.5ms = 90 graden
+// 2100  = 2.1ms = 180 graden
+
+void timer1_init()
+{
+	TCCR1A |= (1 << WGM11);
+	TCCR1B |= (1 << CS11) | (1 << WGM13);
+	// initialize counter
+	ICR1 = 20000;
+	OCR1A = 18500;
+	// enable overflow interrupt
+	TIMSK1 |= (1 << 1);
+	// enable global interrupts
+	sei();
+}
+
+// called whenever TCNT1 overflows
+ISR(TIMER1_COMPA_vect)
+{
+	PORTB ^= (1 << PB7);  // toggles the led
+}
+
 void initUSART(uint16_t ubbr)
 {
 	//set prescalar/baudrate
@@ -32,24 +60,28 @@ void initUSART(uint16_t ubbr)
 	UCSR0C = (1 << USBS0) | (3 << UCSZ00);
 }
 
-/*unsigned char USART_Receive(void)
-{
-	while (!(UCSR0A & (1 << RXC0)));
-	
-	return UDR0;
+void turnServo(uint16_t degrees)
+{	
+	 OCR1A = 20000 - ((degrees * 1200 / 180) + 900);
 }
-*/
+
 
 int main() {
 	sei();
-	initUSART(MYUBBR);
+	//initUSART(MYUBBR);
+	timer1_init();
 	uint8_t delay = 0;
 	//set pin7 to output
-	DDRB = (1 << PB7);
+	DDRB = (1 << PB7);	
+	DDRA = (1 << PA7);
 
 	while (1)
 	{
-		if (received)
+		turnServo(90);
+		wait(10);
+		turnServo(120);
+		wait(10);
+/*		if (received)
 		{
 			switch (data)
 			{
@@ -60,8 +92,16 @@ int main() {
 			received = false;
 		}
 		
-		PORTB ^= (1 << PB7);
-		wait(delay);
+		//PORTB ^= (1 << PB7);
+		//wait(delay);
+		uint16_t count = 0;
+		count = TCNT1H << 8;
+		count += TCNT1L;
+		if (count == 15625)
+		{
+			PORTB ^= (1 << PB7);
+		}
+*/
 	}
 }
 
@@ -75,3 +115,4 @@ ISR(USART0_RX_vect)
 	data = UDR0;
 	received = true;
 }
+
