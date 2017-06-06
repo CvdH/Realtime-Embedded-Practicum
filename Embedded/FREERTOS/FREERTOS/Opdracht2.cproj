@@ -171,6 +171,9 @@
     <Compile Include="semphr.h">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="serial.c">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="serial.h">
       <SubType>compile</SubType>
     </Compile>
@@ -183,7 +186,13 @@
     <Compile Include="tasks.c">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="time.c">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="time.h">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="timers.c">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="timers.h">
