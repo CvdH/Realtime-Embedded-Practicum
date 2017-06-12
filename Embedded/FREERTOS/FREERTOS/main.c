@@ -77,21 +77,10 @@ int main()
 	INT1_init();
 	timer1_init();
 	sei();
-<<<<<<< HEAD
 	initQ();
 	UART_Transmit_String("Setup done");
 
-	xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
-	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
-//	xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
 
-	vTaskStartScheduler();
-
-	return 0;
-}
-=======
-	UART_Transmit_String("Setup done");
->>>>>>> parent of 5fa7dc6... iets
 
 	xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
 	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
