@@ -69,7 +69,7 @@ void UART_Transmit_String(const char *stringPtr);
 int afstand;
 int hoek;
 //end main stuff
-static void TaskBlinkLED(void *pvParameters);
+
 int main() 
 {
 	DDRB = (1 << TRIGGER);											// Trigger pin
@@ -77,6 +77,7 @@ int main()
 	INT1_init();
 	timer1_init();
 	sei();
+<<<<<<< HEAD
 	initQ();
 	UART_Transmit_String("Setup done");
 
@@ -88,36 +89,16 @@ int main()
 
 	return 0;
 }
+=======
+	UART_Transmit_String("Setup done");
+>>>>>>> parent of 5fa7dc6... iets
 
+	xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
+	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
+	xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
 
-static void TaskBlinkLED(void *pvParameters)
-{
-	(void) pvParameters;
-	TickType_t xLastWakeTime;
-	/* The xLastWakeTime variable needs to be initialised with the current tick
-	count.  Note that this is the only time we access this variable.  From this
-	point on xLastWakeTime is managed automatically by the vTaskDelayUntil()
-	API function. */
-	xLastWakeTime = xTaskGetTickCount();
-
-	DDRB |= (1 << PB7);
-
-    while(1)
-    {
-    	PORTB |=  (1 << PB7);       // main (red IO_B7) LED on. EtherMega LED on
-		vTaskDelayUntil( &xLastWakeTime, ( 100 / portTICK_PERIOD_MS ) );
-
-		PORTB &= ~(1 << PB7);       // main (red IO_B7) LED off. EtherMega LED off
-		vTaskDelayUntil( &xLastWakeTime, ( 400 / portTICK_PERIOD_MS ) );
-
-//		if ( _SLEEP_CONTROL_REG & (_BV(SE) ) ); //| (_BV(SM0) | _BV(SM1) | _BV(SM2))) )
-//			xSerialPortReInit( &xSerialPort );
-		//xSerialPrintf( "test");
-		xSerialxPrintf_P( &xSerialPort, PSTR("RedLED HighWater @ %u\r\n"), uxTaskGetStackHighWaterMark(NULL));
-    }
+	vTaskStartScheduler();
 }
-
-
 
 void sonarTaak()
 {
