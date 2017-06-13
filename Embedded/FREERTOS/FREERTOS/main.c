@@ -28,6 +28,7 @@
 #define BAUD 9600
 #define MYUBRR (((F_CPU / (16UL * BAUD))) - 1)
 #define TRIGGER PB0
+#define GELUID PB1
 
 #define RECEIVED_TRUE 1
 #define RECEIVED_FALSE 0
@@ -72,7 +73,8 @@ int hoek;
 
 int main() 
 {
-	DDRB = (1 << TRIGGER);											// Trigger pin
+	DDRB |= (1 << TRIGGER);											// Trigger pin
+	DDRB &= ~(1 << GELUID);
 	UART_Init(MYUBRR);
 	INT1_init();
 	timer3_init();
@@ -106,11 +108,18 @@ void sonarTaak()
 	}
 }
 
-void servoTaak(){
+
+
+
+
+
+void servoTaak()
+{
 
 }
 
-void queueTaak(){
+void queueTaak()
+{
 	while(1){
 		//_delay_ms(DELAY_BETWEEN_TESTS_MS);
 		readQ();
@@ -118,7 +127,15 @@ void queueTaak(){
 			afstand = 300;
 		}
 		hoek = afstand / 300.0 * 180.0;
-		sprintf(out, "Afstand = %dCM, Hoek = %d", afstand,hoek);
+
+		if(! (PINB & (1 << PB1))) //If soud is pressed
+		{
+			sprintf(out, "Afstand = %dCM, Hoek = %d, Geluid = JA", afstand,hoek);
+		}
+		else
+		{
+			sprintf(out, "Afstand = %dCM, Hoek = %d, Geluid = NEIN!!!", afstand,hoek);
+		}
 		UART_Transmit_String(out);
 		writeQ();
 	}
