@@ -67,6 +67,9 @@ void servoTaak();
 void UART_Init( unsigned int ubrr );
 void UART_Transmit( unsigned char data );
 void UART_Transmit_String(const char *stringPtr);
+void turnServo(uint8_t degrees);
+void initServo();
+
 int afstand;
 int hoek;
 //end main stuff
@@ -78,15 +81,14 @@ int main()
 	UART_Init(MYUBRR);
 	INT1_init();
 	timer3_init();
+	initServo();
 	sei();
 	initQ();
 	UART_Transmit_String("Setup done");
 
-
-
 	xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
 	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
-	//xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
+	xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
 
 	vTaskStartScheduler();
 }
@@ -109,13 +111,12 @@ void sonarTaak()
 }
 
 
-
-
-
-
 void servoTaak()
 {
-
+	while(1)
+	{
+		turnServo(afstand);
+	}
 }
 
 void queueTaak()
@@ -259,4 +260,19 @@ ISR(TIMER3_OVF_vect)
 			result = -1;
 		}
 	}
+}
+
+void turnServo(uint8_t degrees)
+{
+	OCR1B = 20000 - (degrees * (1300 / 180) + 800);
+}
+
+void initServo()
+{
+	DDRB |= (1 << PB6);
+	TCCR1A = (1 << WGM11) | (1 << COM1B0) | (1 << COM1B1);
+	TCCR1B = (1 << WGM13) | (1 << CS11);
+	ICR1 = 20000;
+	TCNT1 = 0;
+	turnServo(0);
 }
