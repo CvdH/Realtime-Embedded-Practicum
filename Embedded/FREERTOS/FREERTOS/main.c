@@ -39,7 +39,7 @@
 
 void INT1_init( void );
 void pulse( void );
-void timer1_init( void );
+void timer3_init( void );
 
 char ontvang;														// Global variable to store received data
 int state = RECEIVED_FALSE;
@@ -75,7 +75,7 @@ int main()
 	DDRB = (1 << TRIGGER);											// Trigger pin
 	UART_Init(MYUBRR);
 	INT1_init();
-	timer1_init();
+	timer3_init();
 	sei();
 	initQ();
 	UART_Transmit_String("Setup done");
@@ -84,7 +84,7 @@ int main()
 
 	xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
 	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
-	xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
+	//xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
 
 	vTaskStartScheduler();
 }
@@ -114,10 +114,10 @@ void queueTaak(){
 	while(1){
 		//_delay_ms(DELAY_BETWEEN_TESTS_MS);
 		readQ();
-		if (afstand > 30) {
-			afstand = 30;
+		if (afstand > 300) {
+			afstand = 300;
 		}
-		hoek = afstand / 30.0 * 180.0;
+		hoek = afstand / 300.0 * 180.0;
 		sprintf(out, "Afstand = %dCM, Hoek = %d", afstand,hoek);
 		UART_Transmit_String(out);
 		writeQ();
@@ -198,12 +198,12 @@ ISR(INT1_vect)
 		{
 			up = 1;
 			timerCounter = 0;
-			TCNT1 = 0;
+			TCNT3 = 0;
 		}
 		else														// faling edge
 		{
 			up = 0;
-			result = ((timerCounter * 65535 + TCNT1) / 58) / 2;
+			result = ((timerCounter * 65535 + TCNT3) / 58) / 2;
 			running = 0;
 		}
 	}
@@ -221,19 +221,19 @@ void pulse()
 	PORTB &= ~(1 << TRIGGER);										// zet trigger op 0
 }
 
-void timer1_init()
+void timer3_init()
 {
-	TCCR1B |= (0 << CS10) | (1 << CS11) | (0 << CS12);				// prescaler 1024 so we get 15625Hz clock ticks. or 4.19 s per tick.
-	TCNT1 = 0;														// init counter
-	TIMSK1 |= (1 << TOIE1);											// enable overflow interrupt
+	TCCR3B |= (0 << CS30) | (1 << CS31) | (0 << CS32);				// prescaler 1024 so we get 15625Hz clock ticks. or 4.19 s per tick.
+	TCNT3 = 0;														// init counter
+	TIMSK3 |= (1 << TOIE3);											// enable overflow interrupt
 }
 
-ISR(TIMER1_OVF_vect)
+ISR(TIMER3_OVF_vect)
 {
 	if(up)
 	{
 		timerCounter++;
-		uint32_t ticks = timerCounter * 65535 + TCNT1;
+		uint32_t ticks = timerCounter * 65535 + TCNT3;
 		uint32_t maxTicks = (uint32_t)MAX_RESP_TIME_MS * INSTR_PER_MS;
 		if(ticks > maxTicks)
 		{
