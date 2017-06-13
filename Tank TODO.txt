@@ -1,0 +1,8 @@
+vooruit rijden, 
+stoppen als voor object, 
+bluetooth besturen, 
+sonar ronddraaien, 
+resultaten printen Serial, 
+geluidssensor aan beiden kanten,
+draaien naar geluid toe, 
+alles verschillende taken
