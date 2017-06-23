@@ -38,6 +38,17 @@
 #define MAX_RESP_TIME_MS 200										// timeout - max time to wait for low voltage drop
 #define DELAY_BETWEEN_TESTS_MS 50									// echo cancelling time between sampling
 
+#define L_PLUS PC1
+#define L_MIN PD7
+#define L_EN PL5
+
+#define R_PLUS PG1
+#define R_MIN PL7
+#define R_EN PL3
+
+#
+
+
 void INT1_init( void );
 void pulse( void );
 void timer3_init( void );
@@ -56,19 +67,30 @@ volatile unsigned long result = 0;
 //end servo stuff
 
 //start main stuff
-QueueHandle_t sonarAfstand;
-QueueHandle_t servoHoek;
+//QueueHandle_t sonarAfstand;
+//QueueHandle_t servoHoek;
+QueueHandle_t motorCmd;
 void initQ();
-void readQ();
-void writeQ();
-void queueTaak();
-void sonarTaak();
-void servoTaak();
+//void readQ();
+//void writeQ();
+//void queueTaak();
+//void sonarTaak();
+//void servoTaak();
+void motorTaak();
 void UART_Init( unsigned int ubrr );
 void UART_Transmit( unsigned char data );
 void UART_Transmit_String(const char *stringPtr);
 void turnServo(uint8_t degrees);
 void initServo();
+
+void R_vooruit();
+void R_achteruit();
+void R_enable();
+
+void L_vooruit();
+void L_achteruit();
+void L_enable();
+void M_stop();
 
 int afstand;
 int hoek;
@@ -78,21 +100,118 @@ int main()
 {
 	DDRB |= (1 << TRIGGER);											// Trigger pin
 	DDRB &= ~(1 << GELUID);
+	DDRC |= (1 << L_PLUS);
+	DDRD |= (1 << L_MIN);
+	DDRL |= (1 << L_EN) | (1 << R_MIN) | (1 << R_EN);
+	DDRG |= (1 << R_PLUS);
 	UART_Init(MYUBRR);
-	INT1_init();
-	timer3_init();
-	initServo();
+	//INT1_init();
+	//timer3_init();
+	//initServo();
 	sei();
 	initQ();
 	UART_Transmit_String("Setup done");
 
-	xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
-	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
-	xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
+	xTaskCreate(motorTaak, "Motor Taak", 256, NULL, 3, NULL);
+	//xTaskCreate()
+	//xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
+	//xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
+	//xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
 
 	vTaskStartScheduler();
 }
 
+//void serialReadTaak()
+//{
+
+//}
+
+void motorTaak()
+{
+	R_enable();
+	L_enable();
+
+	//R_vooruit();
+	//L_achteruit();
+	uint8_t temp;
+	while (1)
+	{
+		if (xQueueReceive(motorCmd, &temp, 0))
+		{
+			UART_Transmit(temp);
+			switch(temp)
+			{
+				case 'w':
+					M_stop(); 
+					R_vooruit();
+					L_vooruit();
+					break;
+				case 'a':
+					M_stop(); 
+					R_vooruit();
+					L_achteruit(); 
+					break;
+				case 's':
+					M_stop(); 
+					R_achteruit();
+					L_achteruit(); 
+					break;
+				case 'd':
+					M_stop();
+					R_achteruit();
+					L_vooruit(); 
+					break;
+				case 'x':
+					M_stop();  
+					break;
+				case 'r': 
+					M_stop(); 
+					break;
+			}
+		}
+	}
+}
+
+void UART_Init( unsigned int ubrr)
+{
+	UBRR0H = (ubrr>>8);												// Set baud rate
+	UBRR0L = ubrr;
+
+	UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);					// Enable receiver and transmitter and enable RX interrupt
+	UCSR0C = (3<<UCSZ00);											// Set frame format: 8data, 1 stop bit
+}
+
+void UART_Transmit( unsigned char data )
+{
+	while ( !( UCSR0A & (1<<UDRE0)) ) {};							// Wait for empty transmit buffer
+	UDR0 = data;													// Put data into buffer, sends the data
+}
+
+void UART_Transmit_String(const char *stringPtr)
+{
+	while(*stringPtr != 0x00)
+	{
+		UART_Transmit(*stringPtr);
+		stringPtr++;
+	}
+	
+	UART_Transmit('\n');
+	UART_Transmit('\r');
+}
+
+ISR(USART0_RX_vect)
+{
+	xQueueSend(motorCmd, (void*) &UDR0, 0);
+}
+
+
+void initQ()
+{
+	motorCmd = xQueueCreate(10, sizeof(uint8_t));
+}
+
+
+/*
 void sonarTaak()
 {
 	//UART_Transmit_String("taak uitgevoerd");
@@ -146,59 +265,6 @@ void wait(unsigned int a)
 {
 	while(a--)
 		_delay_ms(50);
-}
-
-//main functions
-void initQ(){
-	sonarAfstand = xQueueCreate(10,sizeof(int));
-	if(sonarAfstand==0) sonarAfstand = xQueueCreate(10,sizeof(int));
-
-	servoHoek = xQueueCreate(10,sizeof(int));
-	if(servoHoek==0) servoHoek = xQueueCreate(10,sizeof(int));
-}
-
-void writeQ( int data)
-{
-	xQueueSend(servoHoek, (void*) &hoek, 0);
-}
-
-void readQ()
-{
-	xQueueReceive(sonarAfstand, &afstand, 0);
-}
-
-void UART_Init( unsigned int ubrr)
-{
-	UBRR0H = (ubrr>>8);												// Set baud rate
-	UBRR0L = ubrr;
-
-	UCSR0B = (1<<RXEN0) | (1<<TXEN0) | (1<<RXCIE0);					// Enable receiver and transmitter and enable RX interrupt
-	UCSR0C = (3<<UCSZ00);											// Set frame format: 8data, 1 stop bit
-}
-
-void UART_Transmit( unsigned char data )
-{
-	while ( !( UCSR0A & (1<<UDRE0)) ) {};							// Wait for empty transmit buffer
-	UDR0 = data;													// Put data into buffer, sends the data
-}
-
-void UART_Transmit_String(const char *stringPtr)
-{
-	while(*stringPtr != 0x00)
-	{
-		UART_Transmit(*stringPtr);
-		stringPtr++;
-	}
-	
-	UART_Transmit('\n');
-	UART_Transmit('\r');
-}
-
-ISR(USART0_RX_vect)
-{
-	ontvang = UDR0;
-	UART_Transmit(ontvang);
-	state = RECEIVED_TRUE;
 }
 
 //Sonar functions
@@ -270,7 +336,7 @@ void turnServo(uint8_t degrees)
 void initServo()
 {
 	DDRA |= (1 << PA7);
-	TCCR1A = (1 << WGM11); /*| (1 << COM1B0) | (1 << COM1B1);*/
+	TCCR1A = (1 << WGM11);
 	TCCR1B = (1 << WGM13) | (1 << CS11);
 	ICR1 = 20000;
 	TCNT1 = 0;
@@ -281,4 +347,40 @@ void initServo()
 ISR(TIMER1_COMPA_vect)
 {
 	PORTA ^= (1 << PA7);
+}
+*/
+
+
+void R_vooruit()
+{
+	PORTG |= (1 << R_PLUS);
+}
+void R_achteruit()
+{
+	PORTL |= (1 << R_MIN);
+}
+void R_enable()
+{
+	PORTL |= (1 << R_EN);
+}
+
+void L_vooruit()
+{
+	PORTC |= (1 << L_PLUS);
+}
+void L_achteruit()
+{
+	PORTD |= (1 << L_MIN);
+}
+void L_enable()
+{
+	PORTL |= (1 << L_EN);
+}
+
+void M_stop()
+{
+	PORTG &= ~(1 << R_PLUS);
+	PORTL &= ~(1 << R_MIN);
+	PORTC &= ~(1 << L_PLUS);
+	PORTD &= ~(1 << L_MIN);
 }
