@@ -1,8 +1,38 @@
-vooruit rijden, 
-stoppen als voor object, 
-bluetooth besturen, 
-sonar ronddraaien, 
-resultaten printen Serial, 
-geluidssensor aan beiden kanten,
-draaien naar geluid toe, 
+vooruit rijden
+stoppen als voor object 
+bluetooth besturen
+sonar ronddraaien 
+resultaten printen Serial 
+geluidssensor aan beiden kanten
+draaien naar geluid toe
 alles verschillende taken
+
+FREERTOS TAKEN:
+SerialReadTask: lees seriele commando's en stuur het door naar andere taken
+draait continu
+	w: MotorTask vooruit rijden
+	a: MotorTask naar links draaien
+	s: MotorTask achteruit rijden
+	d: MotorTask naar rechts draaien
+	x: MotorTask stop
+	rondje: SonarCircleTask draai sensor rond en stuur afstand data naar Serial
+
+MotorTask:
+draait continu (?)
+	vooruit/achteruit/links/rechts/stop
+
+ProximityStopTask:
+draait continu 
+	MotorTask stop als object dichtbij is
+
+SonarCircleTask:
+draait op commando
+	draai Sonar sensor een stukje, sla afstand op
+	herhaal tot Sonar sensor een rondje heeft gemaakt
+	stuur resultaten naar Serial
+	zorg dat Sensor recht naar voren staat	
+
+SoundTask:
+draait continu
+	als geluid detecteert links: MotorTask draai links, stop
+	als geluid detecteert rechts: MotorTask draai rechts, stop
