@@ -15,10 +15,10 @@ draait continu
 	s: MotorTask achteruit rijden
 	d: MotorTask naar rechts draaien
 	x: MotorTask stop
-	rondje: SonarCircleTask draai sensor rond en stuur afstand data naar Serial
+	r: SonarCircleTask draai sensor rond en stuur afstand data naar Serial
 
 MotorTask:
-draait continu (?)
+draait continu
 	vooruit/achteruit/links/rechts/stop
 
 ProximityStopTask:
