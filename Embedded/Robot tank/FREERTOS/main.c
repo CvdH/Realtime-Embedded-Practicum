@@ -2,7 +2,7 @@
  * opd1.c
  *
  *  Created on: Apr 28, 2016
- *      Author: Marcel Vincourt, Casper van der Hout
+ *      Author: MMMMMarcel Vincourt, Casper van der Hout, Joris van Tets, Benjamin van Vuuren
  */
  //#ifndef F_CPU
  #define F_CPU 16000000UL
@@ -46,6 +46,7 @@
 #define R_PLUS PG1
 #define R_MIN PL7
 #define R_EN PL3
+#define SERVO_PIN PL1
 
 #define L_GELUID PA3
 #define R_GELUID PA1
@@ -63,10 +64,6 @@ volatile uint8_t running = 0;										// State to see if the pulse has been sen
 volatile uint8_t up = 0;
 volatile uint32_t timerCounter = 0;
 volatile unsigned long result = 0;
-//end sonar stuff
-
-//start servo stuff
-//end servo stuff
 
 //start main stuff
 //QueueHandle_t sonarAfstand;
@@ -74,20 +71,15 @@ volatile unsigned long result = 0;
 QueueHandle_t motorCmd;
 QueueHandle_t sonarResult;
 void initQ();
-//void readQ();
-//void writeQ();
-//void queueTaak();
-//
-
 void sonarTaak();
-//void servoTaak();
+void servoTaak();
 void motorTaak();
 void soundTaak();
 void UART_Init( unsigned int ubrr );
 void UART_Transmit( unsigned char data );
 void UART_Transmit_String(const char *stringPtr);
-//void turnServo(uint8_t degrees);
-//void initServo();
+void turnServo(uint16_t degrees);
+void initServo();
 void initMotor();
 
 void R_vooruit();
@@ -105,6 +97,7 @@ int hoek;
 char send[20];
 
 bool meetSonar = false;
+bool servoMeet = false;
 
 int main() 
 {
@@ -114,24 +107,18 @@ int main()
 	UART_Init(MYUBRR);
 	INT1_init();
 	timer3_init();
-	//initServo();
+	initServo();
 	sei();
 	initQ();
 	UART_Transmit_String("Setup done");
 
 	xTaskCreate(motorTaak, "Motor Taak", 256, NULL, 3, NULL);
 	xTaskCreate(soundTaak, "Geluid taak", 256, NULL, 3, NULL);
-	//xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
 	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
-	//xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
+	xTaskCreate(servoTaak,"Servo Taak",256,NULL,3,NULL);			//code van Joris & Benjamin 
 
 	vTaskStartScheduler();
 }
-
-//void serialReadTaak()
-//{
-
-//}
 
 void motorTaak()
 {
@@ -178,6 +165,8 @@ void motorTaak()
 					break;
 				case 'r': 
 					meetSonar = false;
+					servoMeet = true;
+					UART_Transmit_String("SERVO!");
 					M_stop(); 
 					break;
 				case 'A':
@@ -305,9 +294,41 @@ void pulse()
 
 void servoTaak()
 {
+	uint16_t temp = 0;
 	while(1)
 	{
-		turnServo(hoek);
+		if (servoMeet)
+		{
+			if( xQueueReceive(sonarResult, &temp, 0) && temp < 60)
+			{
+				itoa(result, send, 10);
+				UART_Transmit_String(send);
+				turnServo(210);
+				vTaskDelay(300);
+			}
+
+			if( xQueueReceive(sonarResult, &temp, 0) && temp < 60)
+			{
+				itoa(result, send, 10);
+				UART_Transmit_String(send);
+				turnServo(240);
+				vTaskDelay(300);
+			}
+
+			if( xQueueReceive(sonarResult, &temp, 0) && temp < 60)
+			{
+				itoa(result, send, 10);
+				UART_Transmit_String(send);
+			}
+			turnServo(185);
+			vTaskDelay(300);
+			
+			servoMeet = false;
+		}
+		else
+		{
+			servoMeet = false;
+		}
 	}
 }
 
@@ -371,28 +392,20 @@ ISR(TIMER3_OVF_vect)
 	}
 }
 
-void turnServo(uint8_t degrees)
+void turnServo(uint16_t degrees)
 {
 	OCR1B = 20000 - (degrees * (1300 / 180) + 800);
 }
 
 void initServo()
 {
-	DDRA |= (1 << PA7);
-	TCCR1A = (1 << WGM11);
+	DDRB |= (1 << PB6);
+	TCCR1A = (1 << WGM11) | (1 << COM1B0) | (1 << COM1B1);
 	TCCR1B = (1 << WGM13) | (1 << CS11);
 	ICR1 = 20000;
 	TCNT1 = 0;
-	turnServo(0);
-	TIMSK1 |= (1 << 1);
+	turnServo(185);
 }
-
-ISR(TIMER1_COMPA_vect)
-{
-	PORTA ^= (1 << PA7);
-}
-
-
 
 void R_vooruit()
 {
