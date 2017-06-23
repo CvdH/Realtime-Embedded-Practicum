@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "FreeRTOS.h"
 #include "task.h" 
@@ -46,8 +47,9 @@
 #define R_MIN PL7
 #define R_EN PL3
 
-#
-
+#define L_GELUID PA3
+#define R_GELUID PA1
+#define PIN_GELUID PINA
 
 void INT1_init( void );
 void pulse( void );
@@ -70,18 +72,23 @@ volatile unsigned long result = 0;
 //QueueHandle_t sonarAfstand;
 //QueueHandle_t servoHoek;
 QueueHandle_t motorCmd;
+QueueHandle_t sonarResult;
 void initQ();
 //void readQ();
 //void writeQ();
 //void queueTaak();
-//void sonarTaak();
+//
+
+void sonarTaak();
 //void servoTaak();
 void motorTaak();
+void soundTaak();
 void UART_Init( unsigned int ubrr );
 void UART_Transmit( unsigned char data );
 void UART_Transmit_String(const char *stringPtr);
-void turnServo(uint8_t degrees);
-void initServo();
+//void turnServo(uint8_t degrees);
+//void initServo();
+void initMotor();
 
 void R_vooruit();
 void R_achteruit();
@@ -95,27 +102,27 @@ void M_stop();
 int afstand;
 int hoek;
 //end main stuff
+char send[20];
+
+bool meetSonar = false;
 
 int main() 
 {
 	DDRB |= (1 << TRIGGER);											// Trigger pin
-	DDRB &= ~(1 << GELUID);
-	DDRC |= (1 << L_PLUS);
-	DDRD |= (1 << L_MIN);
-	DDRL |= (1 << L_EN) | (1 << R_MIN) | (1 << R_EN);
-	DDRG |= (1 << R_PLUS);
+	//DDRB &= ~(1 << GELUID);
+	initMotor();
 	UART_Init(MYUBRR);
-	//INT1_init();
-	//timer3_init();
+	INT1_init();
+	timer3_init();
 	//initServo();
 	sei();
 	initQ();
 	UART_Transmit_String("Setup done");
 
 	xTaskCreate(motorTaak, "Motor Taak", 256, NULL, 3, NULL);
-	//xTaskCreate()
+	xTaskCreate(soundTaak, "Geluid taak", 256, NULL, 3, NULL);
 	//xTaskCreate(queueTaak,"Queue Taken",256,NULL,3,NULL);			//task voor lezen uit sonar queue en schrijven naar servo queue
-	//xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
+	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
 	//xTaskCreate(servoTaak,"Servo Motor",256,NULL,3,NULL);			//code van Joris & Benjamin 
 
 	vTaskStartScheduler();
@@ -142,32 +149,82 @@ void motorTaak()
 			switch(temp)
 			{
 				case 'w':
+					meetSonar = true;
 					M_stop(); 
 					R_vooruit();
 					L_vooruit();
 					break;
 				case 'a':
+					meetSonar = false;
 					M_stop(); 
 					R_vooruit();
 					L_achteruit(); 
 					break;
 				case 's':
+					meetSonar = false;
 					M_stop(); 
 					R_achteruit();
 					L_achteruit(); 
 					break;
 				case 'd':
+					meetSonar = false;
 					M_stop();
 					R_achteruit();
 					L_vooruit(); 
 					break;
 				case 'x':
+					meetSonar = false;
 					M_stop();  
 					break;
 				case 'r': 
+					meetSonar = false;
 					M_stop(); 
 					break;
+				case 'A':
+					meetSonar = false;
+					M_stop();
+					R_vooruit();
+					L_achteruit();
+					vTaskDelay(100);
+					M_stop();
+					break;
+				case 'D':
+					meetSonar = false;
+					M_stop();
+					R_achteruit();
+					L_vooruit();
+					vTaskDelay(100);
+					M_stop();
+					break;
 			}
+		}
+	}
+}
+
+void initMotor()
+{
+	DDRC |= (1 << L_PLUS);
+	DDRD |= (1 << L_MIN);
+	DDRL |= (1 << L_EN) | (1 << R_MIN) | (1 << R_EN);
+	DDRG |= (1 << R_PLUS);
+}
+
+void soundTaak()
+{
+	uint8_t temp = 0;
+	while(1)
+	{
+		if(!(PIN_GELUID & (1 << R_GELUID)))
+		{
+			temp = 'D';
+			UART_Transmit_String("RECHTS\t");
+			xQueueSend(motorCmd, (void*)&temp, 0);
+		}
+		else if(!(PIN_GELUID & (1 << L_GELUID)))
+		{
+			temp = 'A';
+			UART_Transmit_String("LINKS\n");
+			xQueueSend(motorCmd, (void*)&temp, 0);
 		}
 	}
 }
@@ -208,26 +265,42 @@ ISR(USART0_RX_vect)
 void initQ()
 {
 	motorCmd = xQueueCreate(10, sizeof(uint8_t));
+	sonarResult = xQueueCreate(10, sizeof(uint16_t));
 }
 
 
-/*
 void sonarTaak()
 {
-	//UART_Transmit_String("taak uitgevoerd");
-	//wdt_enable(WDTO_2S);											// enable watchdog timer at 2 seconds
+	uint16_t temp = 0;
+	
+	UART_Transmit_String("in sonartaak");
 	while(1)
 	{
-		if(running == 0)
+		_delay_ms(DELAY_BETWEEN_TESTS_MS);
+		if(meetSonar)
 		{
-			_delay_ms(DELAY_BETWEEN_TESTS_MS);
-			pulse();
-			xQueueSend(sonarAfstand, (void*) &result,0);
-			//UART_Transmit_String("loop");
-			//wdt_reset();
+		pulse();
+			if( xQueueReceive(sonarResult, &temp, 0) && temp < 60)
+			{
+				uint8_t temp2 = 'x';
+				xQueueSend(motorCmd, (void*) &temp2,0);
+			}
 		}
 	}
 }
+
+void pulse()
+{
+	PORTB &= ~(1 << TRIGGER);
+	_delay_us(1);
+
+
+	PORTB |= (1 << TRIGGER);										// zet trigger op 1
+	running = 1;
+	_delay_us(10);													// wacht 10 microseconden
+	PORTB &= ~(1 << TRIGGER);										// zet trigger op 0
+}
+
 
 
 void servoTaak()
@@ -238,28 +311,7 @@ void servoTaak()
 	}
 }
 
-void queueTaak()
-{
-	while(1){
-		//_delay_ms(DELAY_BETWEEN_TESTS_MS);
-		readQ();
-		if (afstand > 30) {
-			afstand = 30;
-		}
-		hoek = afstand / 30.0 * 180.0;
 
-		if(! (PINB & (1 << PB1))) //If soud is pressed
-		{
-			sprintf(out, "Afstand = %dCM, Hoek = %d, Geluid = JA", afstand,hoek);
-		}
-		else
-		{
-			sprintf(out, "Afstand = %dCM, Hoek = %d, Geluid = NEIN!!!", afstand,hoek);
-		}
-		UART_Transmit_String(out);
-		writeQ();
-	}
-}
 
 void wait(unsigned int a)
 {
@@ -288,21 +340,12 @@ ISR(INT1_vect)
 		{
 			up = 0;
 			result = ((timerCounter * 65535 + TCNT3) / 58) / 2;
+			//itoa(result, send, 10);
+			//UART_Transmit_String(send);
+			xQueueSend(sonarResult, (void*) &result, 0);
 			running = 0;
 		}
 	}
-}
-
-void pulse()
-{
-	PORTB &= ~(1 << TRIGGER);
-	_delay_us(1);
-
-
-	PORTB |= (1 << TRIGGER);										// zet trigger op 1
-	running = 1;
-	_delay_us(10);													// wacht 10 microseconden
-	PORTB &= ~(1 << TRIGGER);										// zet trigger op 0
 }
 
 void timer3_init()
@@ -348,7 +391,7 @@ ISR(TIMER1_COMPA_vect)
 {
 	PORTA ^= (1 << PA7);
 }
-*/
+
 
 
 void R_vooruit()
