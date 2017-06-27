@@ -8,7 +8,7 @@
  #define F_CPU 16000000UL
  //#endif
  
-
+#include <string.h>
 #include <avr/io.h>
 #include <util/delay.h>
 #include <avr/interrupt.h>
@@ -113,7 +113,7 @@ int main()
 	UART_Transmit_String("Setup done");
 
 	xTaskCreate(motorTaak, "Motor Taak", 256, NULL, 3, NULL);
-	xTaskCreate(soundTaak, "Geluid taak", 256, NULL, 3, NULL);
+	//xTaskCreate(soundTaak, "Geluid taak", 256, NULL, 3, NULL);
 	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
 	xTaskCreate(servoTaak,"Servo Taak",256,NULL,3,NULL);			//code van Joris & Benjamin 
 
@@ -166,7 +166,6 @@ void motorTaak()
 				case 'r': 
 					meetSonar = false;
 					servoMeet = true;
-					UART_Transmit_String("SERVO!");
 					M_stop(); 
 					break;
 				case 'A':
@@ -262,7 +261,7 @@ void sonarTaak()
 {
 	uint16_t temp = 0;
 	
-	UART_Transmit_String("in sonartaak");
+	//UART_Transmit_String("in sonartaak");
 	while(1)
 	{
 		_delay_ms(DELAY_BETWEEN_TESTS_MS);
@@ -296,32 +295,36 @@ void servoTaak()
 {
 	uint16_t temp = 0;
 	while(1)
+	
 	{
 		if (servoMeet)
 		{
-			if( xQueueReceive(sonarResult, &temp, 0) && temp < 60)
-			{
-				itoa(result, send, 10);
-				UART_Transmit_String(send);
-				turnServo(210);
-				vTaskDelay(300);
-			}
+			pulse();
+			while(!xQueueReceive(sonarResult, &temp, 0));
+			char buf[20] = "0 graden: ";
+			itoa(temp, send, 10);
+			strcat(buf, send);
+			UART_Transmit_String(buf);
 
-			if( xQueueReceive(sonarResult, &temp, 0) && temp < 60)
-			{
-				itoa(result, send, 10);
-				UART_Transmit_String(send);
-				turnServo(240);
-				vTaskDelay(300);
-			}
-
-			if( xQueueReceive(sonarResult, &temp, 0) && temp < 60)
-			{
-				itoa(result, send, 10);
-				UART_Transmit_String(send);
-			}
-			turnServo(185);
-			vTaskDelay(300);
+			turnServo(180);
+			vTaskDelay(100);
+			pulse();
+			while(!xQueueReceive(sonarResult, &temp, 0));
+			char buf1[20] = "45 graden: ";
+			itoa(temp, send, 10);
+			strcat(buf1, send);
+			UART_Transmit_String(buf1);
+			
+			turnServo(230);
+			vTaskDelay(100);
+			pulse();
+			while(!xQueueReceive(sonarResult, &temp, 0));
+			char buf2[20] = "90 graden: ";
+			itoa(temp, send, 10);
+			strcat(buf2, send);
+			UART_Transmit_String(buf2);
+			
+			turnServo(110);
 			
 			servoMeet = false;
 		}
@@ -404,7 +407,7 @@ void initServo()
 	TCCR1B = (1 << WGM13) | (1 << CS11);
 	ICR1 = 20000;
 	TCNT1 = 0;
-	turnServo(185);
+	turnServo(110);
 }
 
 void R_vooruit()
