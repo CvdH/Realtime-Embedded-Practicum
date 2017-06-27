@@ -81,15 +81,15 @@ void UART_Transmit_String(const char *stringPtr);
 void turnServo(uint16_t degrees);
 void initServo();
 void initMotor();
-
-void R_vooruit();
-void R_achteruit();
-void R_enable();
-
-void L_vooruit();
-void L_achteruit();
-void L_enable();
+void setSpeed(uint8_t speed);
+void vooruit();
+void achteruit();
+void rechts();
+void links();
+void enable();
 void M_stop();
+
+void TaskWheels( void *pvParameters );
 
 int afstand;
 int hoek;
@@ -122,12 +122,11 @@ int main()
 
 void motorTaak()
 {
-	R_enable();
-	L_enable();
-
-	//R_vooruit();
-	//L_achteruit();
 	uint8_t temp;
+	int16_t speed = 0;
+	int16_t currentSpeed = 0;
+	bool riding = false;
+	setSpeed(speed);
 	while (1)
 	{
 		if (xQueueReceive(motorCmd, &temp, 0))
@@ -136,30 +135,33 @@ void motorTaak()
 			switch(temp)
 			{
 				case 'w':
+					riding = true;
 					meetSonar = true;
-					M_stop(); 
-					R_vooruit();
-					L_vooruit();
+					M_stop();
+					vooruit();
 					break;
 				case 'a':
+					riding = true;
 					meetSonar = false;
 					M_stop(); 
-					R_vooruit();
-					L_achteruit(); 
+					links();
 					break;
 				case 's':
+					currentSpeed = 0;
+					setSpeed(currentSpeed);
+					riding = true;
 					meetSonar = false;
 					M_stop(); 
-					R_achteruit();
-					L_achteruit(); 
+					achteruit();
 					break;
 				case 'd':
+					riding = true;
 					meetSonar = false;
 					M_stop();
-					R_achteruit();
-					L_vooruit(); 
+					rechts();
 					break;
 				case 'x':
+					riding = false;
 					meetSonar = false;
 					M_stop();  
 					break;
@@ -171,22 +173,62 @@ void motorTaak()
 				case 'A':
 					meetSonar = false;
 					M_stop();
-					R_vooruit();
-					L_achteruit();
+					links();
 					vTaskDelay(100);
 					M_stop();
 					break;
 				case 'D':
 					meetSonar = false;
 					M_stop();
-					R_achteruit();
-					L_vooruit();
+					rechts();
 					vTaskDelay(100);
 					M_stop();
 					break;
+				case '+':
+					speed += 10;
+					if (speed > 100)
+						speed = 100;
+					break;
+				case '-':
+					speed -= 10;
+					if (speed < 0)
+						speed = 0;
+					break;
 			}
 		}
+
+		if (riding)
+		{
+			if (currentSpeed <= speed)
+			{
+				currentSpeed += 10;
+				if (currentSpeed > 100)
+					currentSpeed = 100;
+				setSpeed(currentSpeed);
+				vTaskDelay(100);
+			}
+			else if(currentSpeed >= speed)
+			{
+				currentSpeed -= 10;
+				if (currentSpeed < 0)
+					currentSpeed = 0;
+				setSpeed(currentSpeed);
+				vTaskDelay(100);
+			}
+		}
+	
 	}
+}
+
+void setSpeed(uint8_t speed)
+{
+	itoa(speed, send, 10);
+	UART_Transmit_String(send);
+	uint16_t newSpeed = 20000 - (20000 / 100 * speed);
+	itoa(newSpeed, send, 10);
+	UART_Transmit_String(send);
+	OCR5A = newSpeed;
+	OCR5C = newSpeed;  
 }
 
 void initMotor()
@@ -195,6 +237,14 @@ void initMotor()
 	DDRD |= (1 << L_MIN);
 	DDRL |= (1 << L_EN) | (1 << R_MIN) | (1 << R_EN);
 	DDRG |= (1 << R_PLUS);
+
+	TCCR5A = (1 << WGM51) | (1 << COM5A0) | (1 << COM5A1) |
+			 (1 << COM5C0) | (1 << COM5C1);
+	TCCR5B = (1 << WGM53) | (1 << CS51);
+	ICR5 = 20000;
+	TCNT5 = 0;
+
+	enable();
 }
 
 void soundTaak()
@@ -249,13 +299,11 @@ ISR(USART0_RX_vect)
 	xQueueSend(motorCmd, (void*) &UDR0, 0);
 }
 
-
 void initQ()
 {
 	motorCmd = xQueueCreate(10, sizeof(uint8_t));
 	sonarResult = xQueueCreate(10, sizeof(uint16_t));
 }
-
 
 void sonarTaak()
 {
@@ -288,8 +336,6 @@ void pulse()
 	_delay_us(10);													// wacht 10 microseconden
 	PORTB &= ~(1 << TRIGGER);										// zet trigger op 0
 }
-
-
 
 void servoTaak()
 {
@@ -334,8 +380,6 @@ void servoTaak()
 		}
 	}
 }
-
-
 
 void wait(unsigned int a)
 {
@@ -410,29 +454,33 @@ void initServo()
 	turnServo(110);
 }
 
-void R_vooruit()
+void vooruit()
 {
 	PORTG |= (1 << R_PLUS);
-}
-void R_achteruit()
-{
-	PORTL |= (1 << R_MIN);
-}
-void R_enable()
-{
-	PORTL |= (1 << R_EN);
-}
-
-void L_vooruit()
-{
 	PORTC |= (1 << L_PLUS);
 }
-void L_achteruit()
+
+void achteruit()
 {
+	PORTL |= (1 << R_MIN);
 	PORTD |= (1 << L_MIN);
 }
-void L_enable()
+
+void rechts()
 {
+	PORTL |= (1 << R_MIN);
+	PORTC |= (1 << L_PLUS);
+}
+
+void links()
+{
+	PORTG |= (1 << R_PLUS);
+	PORTD |= (1 << L_MIN);
+}
+
+void enable()
+{
+	PORTL |= (1 << R_EN);
 	PORTL |= (1 << L_EN);
 }
 
