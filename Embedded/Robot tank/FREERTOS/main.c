@@ -99,6 +99,8 @@ char send[20];
 bool meetSonar = false;
 bool servoMeet = false;
 
+TaskHandle_t geluidHandle;
+
 int main() 
 {
 	DDRB |= (1 << TRIGGER);											// Trigger pin
@@ -112,8 +114,10 @@ int main()
 	initQ();
 	UART_Transmit_String("Setup done");
 
+	
+
 	xTaskCreate(motorTaak, "Motor Taak", 256, NULL, 3, NULL);
-	//xTaskCreate(soundTaak, "Geluid taak", 256, NULL, 3, NULL);
+	xTaskCreate(soundTaak, "Geluid taak", 256, NULL, 3, &geluidHandle);
 	xTaskCreate(sonarTaak,"Sonar Sensor",256,NULL,3,NULL);			//lees sonar sensor uit en schrijf afstand naar sonar queue
 	xTaskCreate(servoTaak,"Servo Taak",256,NULL,3,NULL);			//code van Joris & Benjamin 
 
@@ -122,6 +126,8 @@ int main()
 
 void motorTaak()
 {
+	vTaskSuspend( geluidHandle );
+
 	uint8_t temp;
 	int16_t speed = 0;
 	int16_t currentSpeed = 0;
@@ -135,6 +141,8 @@ void motorTaak()
 			switch(temp)
 			{
 				case 'w':
+					currentSpeed = 0;
+					setSpeed(currentSpeed);
 					riding = true;
 					meetSonar = true;
 					M_stop();
@@ -171,18 +179,26 @@ void motorTaak()
 					M_stop(); 
 					break;
 				case 'A':
+					//currentSpeed = 100;
+					//setSpeed(currentSpeed);
+					vTaskSuspend( geluidHandle );
 					meetSonar = false;
-					M_stop();
+					//M_stop();
 					links();
 					vTaskDelay(100);
 					M_stop();
+					
 					break;
 				case 'D':
+					//currentSpeed = 100;
+					//setSpeed(currentSpeed);
+					vTaskSuspend( geluidHandle );
 					meetSonar = false;
-					M_stop();
+					//M_stop();
 					rechts();
 					vTaskDelay(100);
 					M_stop();
+					
 					break;
 				case '+':
 					speed += 10;
@@ -193,6 +209,13 @@ void motorTaak()
 					speed -= 10;
 					if (speed < 0)
 						speed = 0;
+					break;
+				case 'g':
+					currentSpeed = 100;
+					setSpeed(currentSpeed);
+					riding = false;
+					vTaskResume( geluidHandle );
+					M_stop();
 					break;
 			}
 		}
@@ -205,7 +228,7 @@ void motorTaak()
 				if (currentSpeed > 100)
 					currentSpeed = 100;
 				setSpeed(currentSpeed);
-				vTaskDelay(100);
+				vTaskDelay(25);
 			}
 			else if(currentSpeed >= speed)
 			{
@@ -213,7 +236,7 @@ void motorTaak()
 				if (currentSpeed < 0)
 					currentSpeed = 0;
 				setSpeed(currentSpeed);
-				vTaskDelay(100);
+				vTaskDelay(25);
 			}
 		}
 	
@@ -345,31 +368,17 @@ void servoTaak()
 	{
 		if (servoMeet)
 		{
-			pulse();
-			while(!xQueueReceive(sonarResult, &temp, 0));
-			char buf[20] = "0 graden: ";
-			itoa(temp, send, 10);
-			strcat(buf, send);
-			UART_Transmit_String(buf);
-
-			turnServo(180);
-			vTaskDelay(100);
-			pulse();
-			while(!xQueueReceive(sonarResult, &temp, 0));
-			char buf1[20] = "45 graden: ";
-			itoa(temp, send, 10);
-			strcat(buf1, send);
-			UART_Transmit_String(buf1);
-			
-			turnServo(230);
-			vTaskDelay(100);
-			pulse();
-			while(!xQueueReceive(sonarResult, &temp, 0));
-			char buf2[20] = "90 graden: ";
-			itoa(temp, send, 10);
-			strcat(buf2, send);
-			UART_Transmit_String(buf2);
-			
+			for(int i = 0; i < 180; i+=20)
+			{
+				pulse();
+				while(!xQueueReceive(sonarResult, &temp, 0));
+				char buf[20] = "Afstand: ";
+				itoa(temp, send, 10);
+				strcat(buf, send);
+				UART_Transmit_String(buf);
+				turnServo(i);
+				vTaskDelay(100);
+			}
 			turnServo(110);
 			
 			servoMeet = false;
